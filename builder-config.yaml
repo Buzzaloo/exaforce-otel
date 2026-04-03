@@ -2,7 +2,6 @@ dist:
   name: exaforce-otel
   description: Exaforce OpenTelemetry Collector
   output_path: ./dist
-  otelcol_version: 0.114.0
 
 exporters:
   - gomod: github.com/Buzzaloo/exaforce-otel/exporter/httpjsonexporter v0.0.0
