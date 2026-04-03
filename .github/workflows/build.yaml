@@ -17,19 +17,51 @@ jobs:
       with:
         go-version: '1.22'
 
+    - name: Debug - Show structure
+      run: |
+        echo "=== Repository structure ==="
+        ls -la
+        echo ""
+        echo "=== httpjsonexporter structure ==="
+        ls -la exporter/httpjsonexporter/
+        echo ""
+        echo "=== builder-config.yaml ==="
+        cat builder-config.yaml
+        echo ""
+        echo "=== go.mod files ==="
+        find . -name go.mod -exec echo "--- {} ---" \; -exec cat {} \;
+
     - name: Install Builder
-      run: go install go.opentelemetry.io/collector/cmd/builder@v0.114.0
+      run: |
+        go install go.opentelemetry.io/collector/cmd/builder@v0.114.0
+        echo "Builder installed at: $(which builder)"
+        ~/go/bin/builder version || true
 
     - name: Build Collector
       run: |
-        ~/go/bin/builder --config builder-config.yaml
-        chmod +x ./dist/exaforce-otel
-        mv ./dist/exaforce-otel ./exaforce-otel-linux-amd64
+        echo "Running builder..."
+        ~/go/bin/builder --config builder-config.yaml --verbose || {
+          echo "Build failed, showing logs..."
+          find . -name "*.log" -exec cat {} \; || true
+          exit 1
+        }
 
-    - name: Create Checksum
-      run: sha256sum exaforce-otel-linux-amd64 > exaforce-otel-linux-amd64.sha256
+    - name: Check output
+      if: success()
+      run: |
+        ls -la ./dist/
+        file ./dist/exaforce-otel
+        chmod +x ./dist/exaforce-otel
+        ./dist/exaforce-otel version || true
+
+    - name: Package binary
+      if: success()
+      run: |
+        mv ./dist/exaforce-otel ./exaforce-otel-linux-amd64
+        sha256sum exaforce-otel-linux-amd64 > exaforce-otel-linux-amd64.sha256
 
     - name: Upload Artifact
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: exaforce-otel-linux-amd64
