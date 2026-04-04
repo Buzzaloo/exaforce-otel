@@ -32,7 +32,7 @@ func NewFactory() exporter.Factory {
 
 func createLogsExporter(
 	ctx context.Context,
-	set exporter.Settings,
+	set exporter.CreateSettings,
 	cfg component.Config,
 ) (exporter.Logs, error) {
 	c := cfg.(*Config)
@@ -44,15 +44,14 @@ func createLogsExporter(
 	}
 
 	// Wrap with standard exporter helper for retry, queue, and observability
-	return exporterhelper.NewLogs(
+	return exporterhelper.NewLogsExporter(
 		ctx,
 		set,
 		cfg,
 		logsExporter.pushLogs,
 		exporterhelper.WithStart(logsExporter.start),
 		exporterhelper.WithShutdown(logsExporter.shutdown),
-		exporterhelper.WithTimeout(exporterhelper.TimeoutConfig{Timeout: c.Timeout}),
+		exporterhelper.WithTimeout(c.Timeout),
 		exporterhelper.WithRetry(c.BackOffConfig),
-		exporterhelper.WithQueue(c.QueueSettings),
 	)
 }

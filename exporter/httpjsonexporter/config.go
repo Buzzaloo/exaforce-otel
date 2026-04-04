@@ -32,9 +32,6 @@ type Config struct {
 	// Default is "none".
 	Compression string `mapstructure:"compression"`
 
-	// QueueSettings defines configuration for the exporter queue.
-	QueueSettings exporterhelper.QueueConfig `mapstructure:"sending_queue"`
-
 	// BackOffConfig defines configuration for retrying failed requests.
 	BackOffConfig configretry.BackOffConfig `mapstructure:"retry_on_failure"`
 }
@@ -70,7 +67,6 @@ func createDefaultConfig() component.Config {
 		},
 		BatchSize:     100,
 		Compression:   "none",
-		QueueSettings: exporterhelper.NewDefaultQueueConfig(),
 		BackOffConfig: configretry.NewDefaultBackOffConfig(),
 	}
 }

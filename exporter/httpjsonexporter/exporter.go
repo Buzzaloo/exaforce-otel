@@ -30,7 +30,7 @@ type httpJSONLogsExporter struct {
 
 func newLogsExporter(
 	ctx context.Context,
-	set exporter.Settings,
+	set exporter.CreateSettings,
 	config *Config,
 ) (*httpJSONLogsExporter, error) {
 	return &httpJSONLogsExporter{
@@ -43,7 +43,7 @@ func newLogsExporter(
 }
 
 func (e *httpJSONLogsExporter) start(ctx context.Context, host component.Host) error {
-	client, err := e.clientSettings.ToClient(ctx, host, e.settings)
+	client, err := e.clientSettings.ToClient(host, e.settings)
 	if err != nil {
 		return err
 	}
