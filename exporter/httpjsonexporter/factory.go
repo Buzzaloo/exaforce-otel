@@ -51,7 +51,7 @@ func createLogsExporter(
 		logsExporter.pushLogs,
 		exporterhelper.WithStart(logsExporter.start),
 		exporterhelper.WithShutdown(logsExporter.shutdown),
-		exporterhelper.WithTimeout(c.Timeout),
+		exporterhelper.WithTimeout(exporterhelper.TimeoutSettings{Timeout: c.Timeout}),
 		exporterhelper.WithRetry(c.BackOffConfig),
 	)
 }
