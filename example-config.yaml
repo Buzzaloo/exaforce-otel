@@ -1,0 +1,69 @@
+# Example Exaforce OpenTelemetry Collector Configuration
+# This config collects Windows Event Logs and sends them to Exaforce
+
+receivers:
+  # Collect Windows Security logs
+  windowseventlog/security:
+    channel: Security
+    
+  # Collect Windows System logs
+  windowseventlog/system:
+    channel: System
+    
+  # Collect Windows Application logs
+  windowseventlog/application:
+    channel: Application
+
+processors:
+  # Prevent memory overload
+  memory_limiter:
+    check_interval: 2s
+    limit_mib: 512
+    
+  # Batch logs for efficiency
+  batch:
+    send_batch_size: 100
+    timeout: 10s
+    
+  # Add host information
+  resourcedetection:
+    detectors: [system, env]
+    system:
+      hostname_sources: [os]
+
+exporters:
+  # Send to Exaforce (replace with your credentials)
+  httpjson:
+    endpoint: "https://hooks.exaforce.com/ingest/YOUR_CONNECTOR_ID"
+    bearer_token: "YOUR_BEARER_TOKEN"
+    compression: gzip
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+  
+  # Debug output (optional - comment out in production)
+  debug:
+    verbosity: detailed
+
+service:
+  # Configure telemetry for the collector itself
+  telemetry:
+    logs:
+      level: info
+  
+  pipelines:
+    logs:
+      receivers: 
+        - windowseventlog/security
+        - windowseventlog/system
+        - windowseventlog/application
+      processors: 
+        - memory_limiter
+        - resourcedetection
+        - batch
+      exporters: 
+        - httpjson
+        # - debug  # Uncomment for testing
