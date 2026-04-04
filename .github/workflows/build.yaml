@@ -6,7 +6,8 @@ on:
     tags: [ 'v*' ]
 
 jobs:
-  build:
+  build-linux:
+    name: Build Linux AMD64
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -17,51 +18,19 @@ jobs:
       with:
         go-version: '1.22'
 
-    - name: Debug - Show structure
-      run: |
-        echo "=== Repository structure ==="
-        ls -la
-        echo ""
-        echo "=== httpjsonexporter structure ==="
-        ls -la exporter/httpjsonexporter/
-        echo ""
-        echo "=== builder-config.yaml ==="
-        cat builder-config.yaml
-        echo ""
-        echo "=== go.mod files ==="
-        find . -name go.mod -exec echo "--- {} ---" \; -exec cat {} \;
-
     - name: Install Builder
-      run: |
-        go install go.opentelemetry.io/collector/cmd/builder@v0.95.0
-        echo "Builder installed at: $(which builder)"
-        ~/go/bin/builder version || true
+      run: go install go.opentelemetry.io/collector/cmd/builder@v0.95.0
 
     - name: Build Collector
       run: |
-        echo "Running builder..."
-        ~/go/bin/builder --config builder-config.yaml --verbose || {
-          echo "Build failed, showing logs..."
-          find . -name "*.log" -exec cat {} \; || true
-          exit 1
-        }
-
-    - name: Check output
-      if: success()
-      run: |
-        ls -la ./dist/
-        file ./dist/exaforce-otel
+        ~/go/bin/builder --config builder-config.yaml
         chmod +x ./dist/exaforce-otel
-        ./dist/exaforce-otel version || true
-
-    - name: Package binary
-      if: success()
-      run: |
         mv ./dist/exaforce-otel ./exaforce-otel-linux-amd64
-        sha256sum exaforce-otel-linux-amd64 > exaforce-otel-linux-amd64.sha256
+
+    - name: Create Checksum
+      run: sha256sum exaforce-otel-linux-amd64 > exaforce-otel-linux-amd64.sha256
 
     - name: Upload Artifact
-      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: exaforce-otel-linux-amd64
@@ -69,28 +38,95 @@ jobs:
           exaforce-otel-linux-amd64
           exaforce-otel-linux-amd64.sha256
 
+  build-windows:
+    name: Build Windows AMD64
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+
+    - name: Install Builder
+      run: go install go.opentelemetry.io/collector/cmd/builder@v0.95.0
+
+    - name: Build Collector for Windows
+      env:
+        GOOS: windows
+        GOARCH: amd64
+      run: |
+        ~/go/bin/builder --config builder-config.yaml
+        # Builder creates the binary without .exe, we need to add it
+        if [ -f ./dist/exaforce-otel ]; then
+          mv ./dist/exaforce-otel ./exaforce-otel-windows-amd64.exe
+        elif [ -f ./dist/exaforce-otel.exe ]; then
+          mv ./dist/exaforce-otel.exe ./exaforce-otel-windows-amd64.exe
+        fi
+
+    - name: Create Checksum
+      run: sha256sum exaforce-otel-windows-amd64.exe > exaforce-otel-windows-amd64.exe.sha256
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: exaforce-otel-windows-amd64
+        path: |
+          exaforce-otel-windows-amd64.exe
+          exaforce-otel-windows-amd64.exe.sha256
+
   release:
+    name: Create Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build-linux, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-    - name: Download Artifacts
+    - name: Download All Artifacts
       uses: actions/download-artifact@v4
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        files: '**/*'
+        files: |
+          **/*
         body: |
           ## Exaforce OpenTelemetry Collector
+          
+          Custom collector with components for Exaforce deployments.
           
           **Components:**
           - Receivers: syslog, windowseventlog, filelog
           - Processors: memory_limiter, batch, resourcedetection, transform, filter
-          - Exporters: awss3, httpjson, debug
+          - Exporters: awss3, httpjson (custom), debug
           
-          **Download:** exaforce-otel-linux-amd64
+          **Downloads:**
+          - Windows: `exaforce-otel-windows-amd64.exe`
+          - Linux: `exaforce-otel-linux-amd64`
+          
+          **Usage:**
+          ```yaml
+          receivers:
+            windowseventlog:
+              channel: Security
+          
+          processors:
+            batch: {}
+          
+          exporters:
+            httpjson:
+              endpoint: "https://hooks.exaforce.com/ingest/YOUR_ID"
+              bearer_token: "YOUR_TOKEN"
+          
+          service:
+            pipelines:
+              logs:
+                receivers: [windowseventlog]
+                processors: [batch]
+                exporters: [httpjson]
+          ```
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
